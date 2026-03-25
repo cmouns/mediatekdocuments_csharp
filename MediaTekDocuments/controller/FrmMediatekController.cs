@@ -1,13 +1,14 @@
-﻿using System.Collections.Generic;
+﻿using MediaTekDocuments.dal;
 using MediaTekDocuments.model;
-using MediaTekDocuments.dal;
+using System;
+using System.Collections.Generic;
 
 namespace MediaTekDocuments.controller
 {
     /// <summary>
     /// Contrôleur lié à FrmMediatek
     /// </summary>
-    class FrmMediatekController
+    public class FrmMediatekController
     {
         /// <summary>
         /// Objet d'accès aux données
@@ -95,6 +96,51 @@ namespace MediaTekDocuments.controller
         public bool CreerExemplaire(Exemplaire exemplaire)
         {
             return access.CreerExemplaire(exemplaire);
+        }
+
+        // MISSION 2 
+
+        public List<Suivi> GetAllSuivis()
+        {
+            return access.GetAllSuivis();
+        }
+
+        public List<CommandeDocument> GetCommandesLivresDvd(string idDocument)
+        {
+            return access.GetCommandesLivresDvd(idDocument);
+        }
+
+        public List<Abonnement> GetAbonnements(string idRevue)
+        {
+            return access.GetAbonnements(idRevue);
+        }
+
+        public bool CreerCommande(Commande commande)
+        {
+            return access.CreerCommande(commande);
+        }
+
+        public bool UpdateSuiviCommande(string idCommande, int idSuivi)
+        {
+            return access.UpdateSuiviCommande(idCommande, idSuivi);
+        }
+
+        public bool SupprimerCommande(string idCommande)
+        {
+            return access.SupprimerCommande(idCommande);
+        }
+
+        public bool ParutionDansAbonnement(DateTime dateCommande, DateTime dateFinAbonnement, DateTime dateParution)
+        {
+            return dateParution >= dateCommande && dateParution <= dateFinAbonnement;
+        }
+
+        /// <summary>
+        /// Vérifie les identifiants et retourne l'utilisateur
+        /// </summary>
+        public Utilisateur GetUtilisateur(string login, string pwd)
+        {
+            return access.GetUtilisateur(login, pwd);
         }
     }
 }

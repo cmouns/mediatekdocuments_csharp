@@ -7,6 +7,7 @@ using Newtonsoft.Json.Converters;
 using Newtonsoft.Json.Linq;
 using System.Configuration;
 using System.Linq;
+using Serilog;
 
 namespace MediaTekDocuments.dal
 {
@@ -18,7 +19,7 @@ namespace MediaTekDocuments.dal
         /// <summary>
         /// adresse de l'API
         /// </summary>
-        private static readonly string uriApi = "http://localhost/rest_mediatekdocuments/";
+        private static readonly string uriApi = "https://sebti.alwaysdata.net/api/api_mediatek/";
         /// <summary>
         /// instance unique de la classe
         /// </summary>
@@ -37,6 +38,13 @@ namespace MediaTekDocuments.dal
         private const string POST = "POST";
         /// <summary>
         /// méthode HTTP pour update
+        /// méthode HTTP pour update
+        /// </summary>
+        private const string PUT = "PUT";
+        /// <summary>
+        /// méthode HTTP pour delete
+        /// </summary>
+        private const string DELETE = "DELETE";
 
         /// <summary>
         /// Méthode privée pour créer un singleton
@@ -44,16 +52,27 @@ namespace MediaTekDocuments.dal
         /// </summary>
         private Access()
         {
+            Log.Logger = new LoggerConfiguration()
+                .MinimumLevel.Verbose()
+                .WriteTo.File("logs/mediatek.txt", rollingInterval: RollingInterval.Day)
+                .CreateLogger();
+
             String authenticationString;
             try
             {
-                authenticationString = "admin:adminpwd";
+                string login = ConfigurationManager.AppSettings["login"];
+                string pwd = ConfigurationManager.AppSettings["pwd"];
+
+                Console.WriteLine("DEBUG LOGIN : '" + login + "'");
+                Console.WriteLine("DEBUG PWD : '" + pwd + "'");
+
+                authenticationString = login + ":" + pwd;
                 api = ApiRest.GetInstance(uriApi, authenticationString);
             }
             catch (Exception e)
             {
-                Console.WriteLine(e.Message);
-                Environment.Exit(0);
+                Log.Fatal("Erreur grave lors de l'accès à l'API : " + e.Message);
+                //Environment.Exit(0);
             }
         }
 
@@ -158,7 +177,7 @@ namespace MediaTekDocuments.dal
             }
             catch (Exception ex)
             {
-                Console.WriteLine(ex.Message);
+                Log.Error(ex.Message);
             }
             return false;
         }
@@ -192,14 +211,79 @@ namespace MediaTekDocuments.dal
                 }
                 else
                 {
-                    Console.WriteLine("code erreur = " + code + " message = " + (String)retour["message"]);
+                    Log.Error("code erreur = " + code + " message = " + (String)retour["message"]);
                 }
             }catch(Exception e)
             {
-                Console.WriteLine("Erreur lors de l'accès à l'API : "+e.Message);
-                Environment.Exit(0);
+                Log.Error("Erreur lors de l'accès à l'API : "+e.Message);
+                //Environment.Exit(0);
             }
             return liste;
+        }
+
+        //  MISSION 2
+
+        public List<Suivi> GetAllSuivis()
+        {
+            IEnumerable<Suivi> lesSuivis = TraitementRecup<Suivi>(GET, "suivi", null);
+            return new List<Suivi>(lesSuivis);
+        }
+
+        public List<CommandeDocument> GetCommandesLivresDvd(string idDocument)
+        {
+            String jsonIdDocument = convertToJson("idLivreDvd", idDocument);
+            return TraitementRecup<CommandeDocument>(GET, "commandedocument/" + jsonIdDocument, null);
+        }
+
+        public List<Abonnement> GetAbonnements(string idRevue)
+        {
+            String jsonIdRevue = convertToJson("idRevue", idRevue);
+            return TraitementRecup<Abonnement>(GET, "abonnement/" + jsonIdRevue, null);
+        }
+
+        public bool CreerCommande(Commande commande)
+        {
+            String jsonCommande = JsonConvert.SerializeObject(commande, new CustomDateTimeConverter());
+            try
+            {
+                string route = commande is CommandeDocument ? "commandedocument" : "abonnement";
+                List<Commande> liste = TraitementRecup<Commande>(POST, route, "champs=" + jsonCommande);
+                return (liste != null);
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex.Message);
+            }
+            return false;
+        }
+
+        public bool UpdateSuiviCommande(string idCommande, int idSuivi)
+        {
+            String jsonUpdate = "{\"id\":\"" + idCommande + "\", \"idSuivi\":" + idSuivi + "}";
+            try
+            {
+                List<CommandeDocument> liste = TraitementRecup<CommandeDocument>(PUT, "commandedocument/" + idCommande, "champs=" + jsonUpdate);
+                return (liste != null);
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex.Message);
+            }
+            return false;
+        }
+
+        public bool SupprimerCommande(string idCommande)
+        {
+            try
+            {
+                List<Commande> liste = TraitementRecup<Commande>(DELETE, "commande/" + convertToJson("id", idCommande), null);
+                return (liste != null);
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex.Message);
+            }
+            return false;
         }
 
         /// <summary>
@@ -242,6 +326,26 @@ namespace MediaTekDocuments.dal
             {
                 serializer.Serialize(writer, value);
             }
+        }
+
+        public Utilisateur GetUtilisateur(string login, string pwd)
+        {
+            Dictionary<string, string> infos = new Dictionary<string, string>
+            {
+                { "login", login },
+                { "pwd", pwd }
+            };
+
+            string jsonParametres = JsonConvert.SerializeObject(infos);
+
+            List<Utilisateur> liste = TraitementRecup<Utilisateur>(GET, "utilisateur/" + jsonParametres, null);
+
+            if (liste != null && liste.Count > 0)
+            {
+                return liste[0];
+            }
+
+            return null;
         }
 
     }
